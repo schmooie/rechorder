@@ -5,3 +5,73 @@
 
 @import 'variables';
 @import 'scaffolding';
+
+h1 {
+  font-size: 2.5em;
+}
+
+section {
+  padding: 1em;
+}
+
+button {
+  padding: 1em;
+  width: 8em;
+  color: white;
+  background-color: $green;
+  border-radius: 5px;
+  border: 0px;
+  &:hover {
+    background-color: darken($green, 10%);
+    cursor: pointer;
+  }
+  &.button--orange {
+    background-color: $orange;
+    &:hover {
+      background-color: darken($orange, 10%);
+    }
+  }
+}
+
+.button-box {
+  button {
+    margin-right: 10px;
+    &:last-child {
+    margin-right: 0;
+  }
+  }
+}
+
+.chord-chart {
+  width: 300px;
+}
+
+.show-moving-dot {
+  .dot-moving {
+    visibility: visible;
+  }
+}
+.dot-moving {
+  visibility: hidden;
+}
+
+.font--red {
+  color: $red;
+}
+
+.font--blue {
+  color: $blue;
+}
+
+.font--black {
+  color: $font-color;
+}
+
+.button-box {
+  display: flex;
+  justify-content: flex-end;
+}
+
+#rechordings {
+  display: flex;
+}

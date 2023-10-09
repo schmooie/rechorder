@@ -29,16 +29,28 @@ const STRING_NUMBERS = [6,5,4,3,2,1];
     dotStrokeColor: ({ moving }) => moving ? colors.defaultActiveStroke : colors.defaultStroke
   });
 
+  const FRETTED_MAP = new Map([
+    [0, null],
+    [1, null],
+    [2, null],
+    [3, null],
+    [4, null],
+    [5, null],
+  ]);
 
-  let dots = [];
+  function getFrettedDots() {
+    return [...FRETTED_MAP.values()].filter(_ => !!_);
+  }
+
   let chords = [];
   fretboard.render([]);
 
   function updateChordGuess() {
+    const frettedDots = getFrettedDots();
     let chordText = '🤔';
 
-    if (dots.length >= 2) {
-      chords = detect(dots.map(_ => _.note))
+    if (frettedDots.length >= 2) {
+      chords = detect(frettedDots.sort((a, b) => a.string > b.string ? -1 : 1).map(_ => _.note))
         // normalize GM -> G
         .map(chordName =>
           chordName[chordName.length - 1] === 'M' ? chordName.substr(0, chordName.length - 1) : chordName
@@ -68,7 +80,7 @@ const STRING_NUMBERS = [6,5,4,3,2,1];
       moving: true
     };
 
-    const dotsToRender = [...dots];
+    const dotsToRender = getFrettedDots();
 
     if (!dotsToRender.find((x) => x.fret === fret && x.string === string)) {
       dotsToRender.push(dot);
@@ -79,12 +91,12 @@ const STRING_NUMBERS = [6,5,4,3,2,1];
 
   fretboard.on('mouseleave', () => {
     $fretboard.classList.remove('show-moving-dot');
-    fretboard.setDots(dots).render();
+    fretboard.setDots(getFrettedDots()).render();
   });
 
   fretboard.on('mouseenter', () => {
     $fretboard.classList.add('show-moving-dot');
-    fretboard.setDots(dots).render();
+    fretboard.setDots(getFrettedDots()).render();
   });
 
   fretboard.on('click', ({ fret, string }) => {
@@ -95,34 +107,18 @@ const STRING_NUMBERS = [6,5,4,3,2,1];
       note: note.substring(0, note.length - 1),
     };
 
-    let removeDot = false;
-    let replaceDot = false;
-    let dotIndex = -1;
-
-    for (let i = 0; i < dots.length; i++) {
-      const currentDot = dots[i];
-
-      if (currentDot.fret === fret && currentDot.string === string) {
-        removeDot = true;
-        dotIndex = i;
-      }
-
-      if (currentDot.string === string) {
-        replaceDot = true;
-        dotIndex = i;
-      }
-    }
+    const removeDot = [...FRETTED_MAP.values()].some((frettedNote) =>
+      frettedNote?.fret === fret && frettedNote?.string === string
+    );
 
     if (removeDot) {
-      dots.splice(dotIndex, 1);
-    } else if (replaceDot) {
-      dots.splice(dotIndex, 1, dot);
+      FRETTED_MAP.set(string - 1, null);
     } else {
-      dots.push(dot);
+      FRETTED_MAP.set(string - 1, dot);
     }
 
+    fretboard.setDots(getFrettedDots()).render();
     updateChordGuess();
-    fretboard.setDots(dots).render();
   });
 
   document
@@ -131,7 +127,6 @@ const STRING_NUMBERS = [6,5,4,3,2,1];
       button.addEventListener("click", ({ currentTarget }) => {
         switch (currentTarget.dataset.action) {
           case "clear-fretboard":
-            dots = [];
             fretboard.clear();
             break;
           default:
@@ -141,29 +136,30 @@ const STRING_NUMBERS = [6,5,4,3,2,1];
     });
 
   $clearButton.addEventListener('click', () => {
-    dots = [];
-    fretboard.setDots(dots).render();
+    FRETTED_MAP.clear();
+    fretboard.setDots(getFrettedDots()).render();
     updateChordGuess();
   });
 
   $rechordButton.addEventListener('click', () => {
-    if (dots.length < 2) {
+    const frettedDots = getFrettedDots();
+    if (frettedDots.length < 2) {
       return;
     }
 
-    const dotsMap = new Map(dots.map(({ fret, string }) => [string, fret]));
+    const dotsMap = new Map(frettedDots.map(({ fret, string }) => [string, fret]));
     const chordString = STRING_NUMBERS.reduce((chString, strNumber) => {
       const fret = dotsMap.get(strNumber);
       const selection = typeof fret === 'number' ? fret : 'x';
+      const delimeter = chString.length > 0 ? '-' : '';
 
-      return chString + selection;
+      return chString + delimeter + selection;
     }, '');
 
     const $chordChart = document.createElement('div');
     const $figure = document.createElement('figure');
     const $figCaption = document.createElement('figcaption');
 
-    console.log(chords.join(' '), chordString)
     createChordChart(chordString, $figure);
     $figCaption.textContent = chords.join(' ');
     $chordChart.className = 'chord-chart';
@@ -175,6 +171,20 @@ const STRING_NUMBERS = [6,5,4,3,2,1];
 
 
 function createChordChart(chordString, el) {
+  let lowestFretNum = Infinity;
+  let highestFretNum = -Infinity;
+
+  const chordFrets = chordString.split('-');
+
+  for (let i = 0; i < chordFrets.length; i++) {
+    const curFretNum = parseInt(chordFrets[i]);
+
+    if (!isNaN(curFretNum)) {
+      highestFretNum = Math.max(highestFretNum, curFretNum);
+      lowestFretNum = Math.min(lowestFretNum, curFretNum);
+    }
+  }
+
   const fretboard = new Fretboard({
     el,
     width: 300,
@@ -183,14 +193,16 @@ function createChordChart(chordString, el) {
     scaleFrets: false,
     stringWidth: 2,
     fretWidth: 2,
-    fretCount: 3,
+    fretCount: highestFretNum - lowestFretNum + 1,
     dotSize: 25,
     dotStrokeWidth: 3,
     fretNumbersMargin: 30,
-    showFretNumbers: false
+    showFretNumbers: true,
+    crop: true
   })
 
   fretboard.renderChord(chordString);
 
   return fretboard;
 }
+
